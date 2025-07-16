@@ -1165,6 +1165,8 @@ private String getSelectedModel() {
         if (!new String(claudeKeyField.getPassword()).isEmpty()) return "claude-3-5-haiku-latest";
         if (!new String(openaiKeyField.getPassword()).isEmpty()) return "gpt-4o-mini"; // Set gpt-4o-mini as the default OpenAI model
         if (!new String(geminiKeyField.getPassword()).isEmpty()) return "gemini-1.5-flash";
+        String host = ollamaHostField.getText();
+        if (host != null && !host.trim().isEmpty()) return "llama3";
     }
     return model;
 }
