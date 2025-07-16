@@ -64,6 +64,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
     private static final int MAX_RETRIES = 3;
     private static final int RETRY_DELAY_MS = 1000;
     private static final String PREF_PREFIX = "ai_auditor.";
+    private static final String DEFAULT_OLLAMA_HOST = "http://localhost:11434";
      
      private MontoyaApi api;
      private PersistedObject persistedData;
@@ -75,6 +76,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
      private JPasswordField openaiKeyField;
      private JPasswordField geminiKeyField;
      private JPasswordField claudeKeyField;
+     private JTextField ollamaHostField;
      private JComboBox<String> modelDropdown;
      private JTextArea promptTemplateArea;
      private JButton saveButton;
@@ -93,6 +95,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         put("claude-3-5-haiku-latest", "claude");
         put("gemini-1.5-pro", "gemini");
         put("gemini-1.5-flash", "gemini");
+        put("llama3", "ollama");
     }};
     
     @Override
@@ -162,27 +165,39 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         addApiKeyField(settingsPanel, gbc, 1, "Google API Key:", geminiKeyField = new JPasswordField(40), "gemini");
         addApiKeyField(settingsPanel, gbc, 2, "Anthropic API Key:", claudeKeyField = new JPasswordField(40), "claude");
 
-        // Model Selection
+        // Ollama Host
         gbc.gridx = 0; gbc.gridy = 3;
+        settingsPanel.add(new JLabel("Ollama Host:"), gbc);
+        ollamaHostField = new JTextField(40);
+        ollamaHostField.setText(DEFAULT_OLLAMA_HOST);
+        gbc.gridx = 1;
+        settingsPanel.add(ollamaHostField, gbc);
+        JButton validateOllamaButton = new JButton("Validate");
+        validateOllamaButton.addActionListener(e -> validateOllamaHost());
+        gbc.gridx = 2;
+        settingsPanel.add(validateOllamaButton, gbc);
+
+        // Model Selection
+        gbc.gridx = 0; gbc.gridy = 4;
         settingsPanel.add(new JLabel("AI Model:"), gbc);
         modelDropdown = new JComboBox<>(new String[]{
             "Default",
             "claude-3-opus-latest",
-            "claude-3-5-sonnet-latest", 
-            "claude-3-5-haiku-latest",  
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
             "gemini-1.5-pro",
             "gemini-1.5-flash",
             "gpt-4o-mini",
             "gpt-4o",
             "o1-preview",
             "o1-mini",
+            "llama3",
         });
-        
         gbc.gridx = 1;
         settingsPanel.add(modelDropdown, gbc);
 
         // Custom Prompt Template
-        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.gridx = 0; gbc.gridy = 5;
         settingsPanel.add(new JLabel("Prompt Template:"), gbc);
         promptTemplateArea = new JTextArea(5, 40);
         promptTemplateArea.setLineWrap(true);
@@ -199,7 +214,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 saveSettings();
             }
         });
-        gbc.gridx = 1; gbc.gridy = 5;
+        gbc.gridx = 1; gbc.gridy = 6;
         settingsPanel.add(saveButton, gbc);
 
         /* planned for future release
@@ -238,12 +253,13 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             String openaiKey = new String(openaiKeyField.getPassword()).trim();
             String geminiKey = new String(geminiKeyField.getPassword()).trim();
             String claudeKey = new String(claudeKeyField.getPassword()).trim();
+            String ollamaHost = ollamaHostField.getText().trim();
             
-            // Check if at least one valid key is provided
-            if (openaiKey.isEmpty() && geminiKey.isEmpty() && claudeKey.isEmpty()) {
+            // Check if at least one valid provider is configured
+            if (openaiKey.isEmpty() && geminiKey.isEmpty() && claudeKey.isEmpty() && ollamaHost.isEmpty()) {
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(mainPanel,
-                        "Please provide at least one API key",
+                        "Please configure at least one provider",
                         "Validation Error",
                         JOptionPane.WARNING_MESSAGE);
                 });
@@ -254,6 +270,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             api.persistence().preferences().setString(PREF_PREFIX + "openai_key", openaiKey);
             api.persistence().preferences().setString(PREF_PREFIX + "gemini_key", geminiKey);
             api.persistence().preferences().setString(PREF_PREFIX + "claude_key", claudeKey);
+            api.persistence().preferences().setString(PREF_PREFIX + "ollama_host", ollamaHost);
             
             // Save selected model
             String selectedModel = (String) modelDropdown.getSelectedItem();
@@ -270,7 +287,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             api.persistence().preferences().setLong(PREF_PREFIX + "last_save", System.currentTimeMillis());
             
             // Verify saves were successful
-            boolean allValid = verifySettings(openaiKey, geminiKey, claudeKey);
+            boolean allValid = verifySettings(openaiKey, geminiKey, claudeKey, ollamaHost);
             
             if (allValid) {
                 SwingUtilities.invokeLater(() -> {
@@ -292,7 +309,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         }
     }
     
-    private boolean verifySettings(String openaiKey, String geminiKey, String claudeKey) {
+    private boolean verifySettings(String openaiKey, String geminiKey, String claudeKey, String ollamaHost) {
         boolean allValid = true;
         StringBuilder errors = new StringBuilder();
         
@@ -313,6 +330,12 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         if (!claudeKey.equals(verifyClaude)) {
             allValid = false;
             errors.append("Claude key verification failed\n");
+        }
+
+        String verifyOllama = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
+        if (!ollamaHost.equals(verifyOllama)) {
+            allValid = false;
+            errors.append("Ollama host verification failed\n");
         }
         
         if (!allValid) {
@@ -335,6 +358,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             String openaiKey = api.persistence().preferences().getString(PREF_PREFIX + "openai_key");
             String geminiKey = api.persistence().preferences().getString(PREF_PREFIX + "gemini_key");
             String claudeKey = api.persistence().preferences().getString(PREF_PREFIX + "claude_key");
+            String ollamaHost = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
             
             // Load selected model
             String selectedModel = api.persistence().preferences().getString(PREF_PREFIX + "selected_model");
@@ -348,6 +372,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             api.logging().logToOutput("- Gemini key: " + (geminiKey != null ? "exists" : "null"));
             api.logging().logToOutput("- Claude key: " + (claudeKey != null ? "exists" : "null"));
             api.logging().logToOutput("- Selected model: " + selectedModel);
+            api.logging().logToOutput("- Ollama host: " + (ollamaHost != null ? ollamaHost : "null"));
             
             // Update UI components
             SwingUtilities.invokeLater(() -> {
@@ -355,6 +380,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 openaiKeyField.setText(openaiKey != null ? openaiKey : "");
                 geminiKeyField.setText(geminiKey != null ? geminiKey : "");
                 claudeKeyField.setText(claudeKey != null ? claudeKey : "");
+                ollamaHostField.setText(ollamaHost != null ? ollamaHost : DEFAULT_OLLAMA_HOST);
                 
                 // Set selected model
                 if (selectedModel != null && modelDropdown != null) {
@@ -516,8 +542,11 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                              + "  ]"
                              + "}";
                     break;
-                
-    
+
+                case "ollama":
+                    validateOllamaHost();
+                    return;
+
                 default:
                     JOptionPane.showMessageDialog(mainPanel, "Unknown provider: " + provider, "Validation Error", JOptionPane.ERROR_MESSAGE);
                     return;
@@ -533,6 +562,30 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         } catch (Exception e) {
             api.logging().logToError("Error validating API key for " + provider + ": " + e.getMessage());
             JOptionPane.showMessageDialog(mainPanel, "Error validating API key: " + e.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void validateOllamaHost() {
+        String host = ollamaHostField.getText().trim();
+        if (host.isEmpty()) {
+            showValidationError("Ollama host is empty");
+            return;
+        }
+        try {
+            if (!host.startsWith("http")) {
+                host = "http://" + host;
+            }
+            URL url = new URL(host + "/api/tags");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            int code = conn.getResponseCode();
+            if (code == 200) {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host reachable");
+            } else {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host returned status " + code);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(mainPanel, "Error reaching Ollama host: " + ex.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -693,8 +746,8 @@ private void showValidationError(String message) {
         String selectedModel = getSelectedModel();
         String provider = MODEL_MAPPING.get(selectedModel);
         String apiKey = getApiKeyForModel(selectedModel);
-    
-        if (apiKey == null || apiKey.isEmpty()) {
+
+        if (!"ollama".equals(provider) && (apiKey == null || apiKey.isEmpty())) {
             SwingUtilities.invokeLater(() ->
                 JOptionPane.showMessageDialog(mainPanel, "API key not configured for " + selectedModel));
             return;
@@ -795,7 +848,21 @@ private void showValidationError(String message) {
                                 .put("role", "user")
                                 .put("content", prompt + "\n\nContent to analyze:\n" + content)));
                 break;
-    
+
+            case "ollama":
+                String base = ollamaHostField.getText().trim();
+                if (base.isEmpty()) {
+                    base = DEFAULT_OLLAMA_HOST;
+                }
+                if (!base.startsWith("http")) {
+                    base = "http://" + base;
+                }
+                url = new URL(base + "/api/generate");
+                jsonBody.put("model", model)
+                        .put("prompt", prompt + "\n\nContent to analyze:\n" + content)
+                        .put("stream", false);
+                break;
+
             default:
                 throw new IllegalArgumentException("Unsupported provider: " + provider);
         }
@@ -838,6 +905,9 @@ private void showValidationError(String message) {
                 break;
             case "gemini":
                 // Google API key is included in the URL bc ofc Google
+                break;
+            case "ollama":
+                // no authentication required
                 break;
         }
 
@@ -994,6 +1064,9 @@ private String extractContentFromResponse(JSONObject response, String model) {
                         .getJSONObject("message")
                         .getString("content");
 
+            case "ollama":
+                return response.getString("response");
+
             default:
                 throw new IllegalArgumentException("Unsupported provider: " + provider);
         }
@@ -1092,6 +1165,8 @@ private String getSelectedModel() {
         if (!new String(claudeKeyField.getPassword()).isEmpty()) return "claude-3-5-haiku-latest";
         if (!new String(openaiKeyField.getPassword()).isEmpty()) return "gpt-4o-mini"; // Set gpt-4o-mini as the default OpenAI model
         if (!new String(geminiKeyField.getPassword()).isEmpty()) return "gemini-1.5-flash";
+        String host = ollamaHostField.getText();
+        if (host != null && !host.trim().isEmpty()) return "llama3";
     }
     return model;
 }
@@ -1106,6 +1181,7 @@ private String getApiKeyForModel(String model) {
         case "openai": return new String(openaiKeyField.getPassword());
         case "gemini": return new String(geminiKeyField.getPassword());
         case "claude": return new String(claudeKeyField.getPassword());
+        case "ollama": return ""; // no API key needed
         default: return null;
     }
 }
