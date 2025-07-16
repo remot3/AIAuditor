@@ -95,7 +95,9 @@ The compiled JAR will be available at `target/ai-auditor-1.0-SNAPSHOT-jar-with-d
 ## Usage
 ### Initial Setup
 1. Go to the AI Auditor tab in Burp Suite.
+
 2. Enter your API key(s) for OpenAI, Gemini, and/or Claude, then click **Validate** to confirm each key is working. If using Ollama, specify your host and click **Validate** to ensure it's reachable. If no API keys are configured, the **Default** model will automatically use the local `llama3` model when an Ollama host is provided.
+
 3. *Optional*: Add **Custom Instructions** to refine the analysis.
 4. Save your settings.
 
