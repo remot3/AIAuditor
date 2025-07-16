@@ -15,7 +15,7 @@ AI Auditor is an extension for Burp Suite Professional Edition and Burp Suite En
 
 ## Features
 ### Core Capabilities
-* **Multi-Provider AI Integration**: **OpenAI** (`gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`), **Google Gemini** (`gemini-1.5-pro`, `gemini-1.5-flash`), **Anthropic Claude** (`claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`, `claude-3-opus-latest`)
+* **Multi-Provider AI Integration**: **OpenAI** (`gpt-4o`, `gpt-4o-mini`, `o1-preview`, `o1-mini`), **Google Gemini** (`gemini-1.5-pro`, `gemini-1.5-flash`), **Anthropic Claude** (`claude-3-5-sonnet-latest`, `claude-3-5-haiku-latest`, `claude-3-opus-latest`), **Ollama** (local models like `llama3`)
 * **Detailed Vulnerability Reporting**: Vulnerability description, location, exploitation methods, severity levels (`HIGH`, `MEDIUM`, `LOW`, `INFORMATIVE`) and confidence levels (`CERTAIN`, `FIRM`, `TENTATIVE`).
 * **Custom Instructions**: Tailor the AI’s focus and analysis for special use cases.
 * ~~**Context-Aware Analysis**: Configure number of requests/responses analyzed together (`0`—`5`).~~
@@ -30,6 +30,7 @@ AI Auditor is an extension for Burp Suite Professional Edition and Burp Suite En
   * [Anthropic](https://docs.anthropic.com/en/api/getting-started)
   * [Google Gemini](https://ai.google.dev/gemini/get_the_api_key) — recommended for newbies since Google offers a relatively generous free tier to use its Gemini API.
   * [OpenAI](https://platform.openai.com/docs/quickstart)
+  * Or a running **Ollama** instance (e.g., `http://localhost:11434`)
 * **Burp Suite Professional Edition** or **Burp Suite Enterprise Edition**
   * **NOTE**: Burp Suite Community Edition is currently not supported.
 
@@ -94,7 +95,7 @@ The compiled JAR will be available at `target/ai-auditor-1.0-SNAPSHOT-jar-with-d
 ## Usage
 ### Initial Setup
 1. Go to the AI Auditor tab in Burp Suite.
-2. Enter your API key(s) for OpenAI, Gemini, and/or Claude, then click **Validate** to confirm each key is working.
+2. Enter your API key(s) for OpenAI, Gemini, and/or Claude, then click **Validate** to confirm each key is working. If using Ollama, specify your host and click **Validate** to ensure it's reachable.
 3. *Optional*: Add **Custom Instructions** to refine the analysis.
 4. Save your settings.
 
