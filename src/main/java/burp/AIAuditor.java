@@ -394,6 +394,10 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- For sensitive info disclosure, specify exact data exposed\n" +
             "- Only return JSON with findings, no other content!";
     }
+
+    private String getTestingPromptTemplate() {
+        return "You are a security tester. Review the following HTTP request and response and provide a short bulleted list of specific security tests to perform.";
+    }
     
 
     private void validateOllamaHost() {
@@ -445,8 +449,8 @@ private void showValidationError(String message) {
             menuItems.add(scanSelected);
         }
 
-        // Add full scan option
-        JMenuItem scanFull = new JMenuItem("AI Companion > Scan Full Request/Response");
+        // Add suggestion option
+        JMenuItem scanFull = new JMenuItem("AI Companion > Suggest Tests");
         scanFull.addActionListener(e -> handleFullScan(reqRes));
         menuItems.add(scanFull);
 
@@ -462,11 +466,11 @@ private void showValidationError(String message) {
     List<HttpRequestResponse> selectedItems = event.selectedRequestResponses();
     if (!selectedItems.isEmpty()) {
         if (selectedItems.size() == 1) {
-            JMenuItem scanItem = new JMenuItem("AI Companion > Scan Request/Response");
+            JMenuItem scanItem = new JMenuItem("AI Companion > Suggest Tests");
             scanItem.addActionListener(e -> handleFullScan(selectedItems.get(0)));
             menuItems.add(scanItem);
         } else {
-            JMenuItem scanMultiple = new JMenuItem(String.format("AI Companion > Scan %d Requests", selectedItems.size()));
+            JMenuItem scanMultiple = new JMenuItem(String.format("AI Companion > Suggest Tests for %d Requests", selectedItems.size()));
             scanMultiple.addActionListener(e -> handleMultipleScan(selectedItems));
             menuItems.add(scanMultiple);
         }
@@ -510,7 +514,7 @@ private void showValidationError(String message) {
         if (reqRes == null || reqRes.request() == null) {
             return;
         }
-        processAuditRequest(reqRes, null, false);
+        processTestSuggestions(reqRes);
     }
 
     private void handleMultipleScan(List<HttpRequestResponse> requests) {
@@ -525,7 +529,7 @@ private void showValidationError(String message) {
             
             for (HttpRequestResponse reqRes : batch) {
                 if (reqRes != null && reqRes.request() != null) {
-                    processAuditRequest(reqRes, null, false);
+                    processTestSuggestions(reqRes);
                 }
             }
 
@@ -539,6 +543,42 @@ private void showValidationError(String message) {
                 }
             }
         }
+    }
+
+    private void processTestSuggestions(HttpRequestResponse reqRes) {
+        String selectedModel = getSelectedModel();
+        String provider = MODEL_MAPPING.get(selectedModel);
+        String apiKey = getApiKeyForModel(selectedModel);
+
+        if (!"ollama".equals(provider) && (apiKey == null || apiKey.isEmpty())) {
+            SwingUtilities.invokeLater(() ->
+                JOptionPane.showMessageDialog(mainPanel, "API key not configured for " + selectedModel));
+            return;
+        }
+
+        CompletableFuture<JSONObject> future = threadPoolManager.submitTask(provider, () -> {
+            String request = reqRes.request().toString();
+            String response = reqRes.response() != null ? reqRes.response().toString() : "";
+            String content = request + "\n\n" + response;
+            String prompt = getTestingPromptTemplate();
+            return sendToAI(selectedModel, apiKey, content, prompt);
+        });
+
+        future.thenAccept(result -> {
+            try {
+                String ideas = extractContentFromResponse(result, selectedModel);
+                if (ideas != null && !ideas.isEmpty()) {
+                    reqRes.annotations().setNotes(ideas.trim());
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Error processing AI suggestions: " + e.getMessage());
+                showError("Error processing AI suggestions", e);
+            }
+        }).exceptionally(e -> {
+            api.logging().logToError("Error getting AI suggestions: " + e.getMessage());
+            showError("Error getting AI suggestions", e);
+            return null;
+        });
     }
 
     private void handleRenameRepeaterTab(MessageEditorHttpRequestResponse editor) {
@@ -656,15 +696,19 @@ private void showValidationError(String message) {
     
 
     private JSONObject sendToAI(String model, String apiKey, String content) throws Exception {
+        return sendToAI(model, apiKey, content, null);
+    }
+
+    private JSONObject sendToAI(String model, String apiKey, String content, String overridePrompt) throws Exception {
         String provider = MODEL_MAPPING.get(model);
         if (provider == null) {
             throw new IllegalArgumentException("Unsupported model: " + model);
         }
-    
+
         URL url;
         JSONObject jsonBody = new JSONObject();
-        String prompt = promptTemplateArea.getText();
-    
+        String prompt = overridePrompt != null ? overridePrompt : promptTemplateArea.getText();
+
         if (prompt == null || prompt.isEmpty()) {
             prompt = getDefaultPromptTemplate();
         }
