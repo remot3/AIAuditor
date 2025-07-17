@@ -420,6 +420,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- Only return JSON with findings, no other content!";
     }
 
+
     private String getDefaultTestingPrompt() {
         return "You are a security tester. Review the following HTTP request and response and provide a short bulleted list of specific security tests to perform.";
     }
@@ -432,6 +433,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             }
         }
         return getDefaultTestingPrompt();
+
     }
     
 
@@ -603,12 +605,14 @@ private void showValidationError(String message) {
             try {
                 String ideas = extractContentFromResponse(result, selectedModel);
                 if (ideas != null && !ideas.isEmpty()) {
+
                     String list = extractTestsList(ideas);
                     if (!list.isEmpty()) {
                         reqRes.annotations().setNotes("Security Tests to Perform:\n" + list);
                     } else {
                         reqRes.annotations().setNotes(ideas.trim());
                     }
+
                 }
             } catch (Exception e) {
                 api.logging().logToError("Error processing AI suggestions: " + e.getMessage());
