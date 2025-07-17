@@ -66,9 +66,7 @@ public class ThreadPoolManager {
         this.rateLimiters = new HashMap<>();
         
         // Initialize rate limiters
-        rateLimiters.put("openai", new RateLimiter(50, 60));    // 50 requests per minute
-        rateLimiters.put("claude", new RateLimiter(100, 60)); // 100 requests per minute
-        rateLimiters.put("gemini", new RateLimiter(60, 60));    // 60 requests per minute
+
         rateLimiters.put("ollama", new RateLimiter(60, 60));    // 60 requests per minute
 
         this.executor = new ThreadPoolExecutor(

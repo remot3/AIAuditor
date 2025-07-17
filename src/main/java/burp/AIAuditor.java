@@ -60,10 +60,10 @@ import javax.swing.*;
 import java.awt.*;
  
 public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanCheck {
-    private static final String EXTENSION_NAME = "AI Auditor";
+    private static final String EXTENSION_NAME = "AI Companion";
     private static final int MAX_RETRIES = 3;
     private static final int RETRY_DELAY_MS = 1000;
-    private static final String PREF_PREFIX = "ai_auditor.";
+    private static final String PREF_PREFIX = "ai_companion.";
     private static final String DEFAULT_OLLAMA_HOST = "http://localhost:11434";
      
      private MontoyaApi api;
@@ -73,10 +73,8 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
      
      // UI Components
      private JPanel mainPanel;
-     private JPasswordField openaiKeyField;
-     private JPasswordField geminiKeyField;
-     private JPasswordField claudeKeyField;
-     private JTextField ollamaHostField;
+
+    private JTextField ollamaHostField;
      private JComboBox<String> modelDropdown;
      private JTextArea promptTemplateArea;
      private JButton saveButton;
@@ -86,15 +84,6 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
      // Model Constants
      private static final Map<String, String> MODEL_MAPPING = new HashMap<String, String>() {{
         put("Default", "");
-        put("gpt-4o", "openai");
-        put("gpt-4o-mini", "openai");
-        put("o1-preview", "openai");
-        put("o1-mini", "openai");
-        put("claude-3-opus-latest", "claude");
-        put("claude-3-5-sonnet-latest", "claude");
-        put("claude-3-5-haiku-latest", "claude");
-        put("gemini-1.5-pro", "gemini");
-        put("gemini-1.5-flash", "gemini");
         put("llama3", "ollama");
     }};
     
@@ -160,13 +149,10 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(5, 5, 5, 5);
 
-        // API Keys
-        addApiKeyField(settingsPanel, gbc, 0, "OpenAI API Key:", openaiKeyField = new JPasswordField(40), "openai");
-        addApiKeyField(settingsPanel, gbc, 1, "Google API Key:", geminiKeyField = new JPasswordField(40), "gemini");
-        addApiKeyField(settingsPanel, gbc, 2, "Anthropic API Key:", claudeKeyField = new JPasswordField(40), "claude");
+
 
         // Ollama Host
-        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridx = 0; gbc.gridy = 0;
         settingsPanel.add(new JLabel("Ollama Host:"), gbc);
         ollamaHostField = new JTextField(40);
         ollamaHostField.setText(DEFAULT_OLLAMA_HOST);
@@ -177,27 +163,21 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         gbc.gridx = 2;
         settingsPanel.add(validateOllamaButton, gbc);
 
+
         // Model Selection
-        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.gridx = 0; gbc.gridy = 1;
         settingsPanel.add(new JLabel("AI Model:"), gbc);
         modelDropdown = new JComboBox<>(new String[]{
             "Default",
-            "claude-3-opus-latest",
-            "claude-3-5-sonnet-latest",
-            "claude-3-5-haiku-latest",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash",
-            "gpt-4o-mini",
-            "gpt-4o",
-            "o1-preview",
-            "o1-mini",
-            "llama3",
+            "llama3"
+
         });
         gbc.gridx = 1;
         settingsPanel.add(modelDropdown, gbc);
 
         // Custom Prompt Template
-        gbc.gridx = 0; gbc.gridy = 5;
+
+        gbc.gridx = 0; gbc.gridy = 2;
         settingsPanel.add(new JLabel("Prompt Template:"), gbc);
         promptTemplateArea = new JTextArea(5, 40);
         promptTemplateArea.setLineWrap(true);
@@ -214,7 +194,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 saveSettings();
             }
         });
-        gbc.gridx = 1; gbc.gridy = 6;
+
+        gbc.gridx = 1; gbc.gridy = 3;
+
         settingsPanel.add(saveButton, gbc);
 
         /* planned for future release
@@ -230,46 +212,28 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         //mainPanel.add(statusPanel, BorderLayout.CENTER);
 
         // Register the tab
-        api.userInterface().registerSuiteTab("AI Auditor", mainPanel);
+        api.userInterface().registerSuiteTab("AI Companion", mainPanel);
     }
 
-    private void addApiKeyField(JPanel panel, GridBagConstraints gbc, int row, String label, 
-                              JPasswordField field, String provider) {
-        gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel(label), gbc);
-        gbc.gridx = 1;
-        panel.add(field, gbc);
-        JButton validateButton = new JButton("Validate");
-        validateButton.addActionListener(e -> validateApiKey(provider));
-        gbc.gridx = 2;
-        panel.add(validateButton, gbc);
-    }
 
     private void saveSettings() {
         api.logging().logToOutput("Starting saveSettings()...");
-        
+
         try {
-            // Get API keys from UI fields
-            String openaiKey = new String(openaiKeyField.getPassword()).trim();
-            String geminiKey = new String(geminiKeyField.getPassword()).trim();
-            String claudeKey = new String(claudeKeyField.getPassword()).trim();
+
             String ollamaHost = ollamaHostField.getText().trim();
-            
-            // Check if at least one valid provider is configured
-            if (openaiKey.isEmpty() && geminiKey.isEmpty() && claudeKey.isEmpty() && ollamaHost.isEmpty()) {
+
+            if (ollamaHost.isEmpty()) {
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(mainPanel,
-                        "Please configure at least one provider",
+                        "Please configure the Ollama host",
+
                         "Validation Error",
                         JOptionPane.WARNING_MESSAGE);
                 });
                 return;
             }
-            
-            // Save using Montoya preferences
-            api.persistence().preferences().setString(PREF_PREFIX + "openai_key", openaiKey);
-            api.persistence().preferences().setString(PREF_PREFIX + "gemini_key", geminiKey);
-            api.persistence().preferences().setString(PREF_PREFIX + "claude_key", claudeKey);
+
             api.persistence().preferences().setString(PREF_PREFIX + "ollama_host", ollamaHost);
             
             // Save selected model
@@ -287,7 +251,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             api.persistence().preferences().setLong(PREF_PREFIX + "last_save", System.currentTimeMillis());
             
             // Verify saves were successful
-            boolean allValid = verifySettings(openaiKey, geminiKey, claudeKey, ollamaHost);
+
+            boolean allValid = verifySettings(ollamaHost);
+
             
             if (allValid) {
                 SwingUtilities.invokeLater(() -> {
@@ -309,55 +275,27 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         }
     }
     
-    private boolean verifySettings(String openaiKey, String geminiKey, String claudeKey, String ollamaHost) {
-        boolean allValid = true;
-        StringBuilder errors = new StringBuilder();
-        
-        // Verify each key was saved correctly
-        String verifyOpenai = api.persistence().preferences().getString(PREF_PREFIX + "openai_key");
-        if (!openaiKey.equals(verifyOpenai)) {
-            allValid = false;
-            errors.append("OpenAI key verification failed\n");
-        }
-        
-        String verifyGemini = api.persistence().preferences().getString(PREF_PREFIX + "gemini_key"); 
-        if (!geminiKey.equals(verifyGemini)) {
-            allValid = false;
-            errors.append("Gemini key verification failed\n");
-        }
-        
-        String verifyClaude = api.persistence().preferences().getString(PREF_PREFIX + "claude_key");
-        if (!claudeKey.equals(verifyClaude)) {
-            allValid = false;
-            errors.append("Claude key verification failed\n");
-        }
 
+    private boolean verifySettings(String ollamaHost) {
         String verifyOllama = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
-        if (!ollamaHost.equals(verifyOllama)) {
-            allValid = false;
-            errors.append("Ollama host verification failed\n");
+        boolean valid = ollamaHost.equals(verifyOllama);
+        if (!valid) {
+            api.logging().logToError("Settings verification failed: Ollama host mismatch");
+
         }
-        
-        if (!allValid) {
-            api.logging().logToError("Settings verification failed:\n" + errors.toString());
-        }
-        
-        return allValid;
+        return valid;
     }
     
     private void loadSavedSettings() {
         api.logging().logToOutput("Starting loadSavedSettings()...");
         
-        if (openaiKeyField == null || geminiKeyField == null || claudeKeyField == null) {
+        if (ollamaHostField == null) {
             api.logging().logToError("Cannot load settings - UI components not initialized");
             return;
         }
         
         try {
-            // Load API keys
-            String openaiKey = api.persistence().preferences().getString(PREF_PREFIX + "openai_key");
-            String geminiKey = api.persistence().preferences().getString(PREF_PREFIX + "gemini_key");
-            String claudeKey = api.persistence().preferences().getString(PREF_PREFIX + "claude_key");
+
             String ollamaHost = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
             
             // Load selected model
@@ -368,18 +306,12 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             
             // Log retrieval status
             api.logging().logToOutput("Retrieved from preferences:");
-            api.logging().logToOutput("- OpenAI key: " + (openaiKey != null ? "exists" : "null"));
-            api.logging().logToOutput("- Gemini key: " + (geminiKey != null ? "exists" : "null"));
-            api.logging().logToOutput("- Claude key: " + (claudeKey != null ? "exists" : "null"));
             api.logging().logToOutput("- Selected model: " + selectedModel);
             api.logging().logToOutput("- Ollama host: " + (ollamaHost != null ? ollamaHost : "null"));
             
             // Update UI components
             SwingUtilities.invokeLater(() -> {
-                // Set API keys
-                openaiKeyField.setText(openaiKey != null ? openaiKey : "");
-                geminiKeyField.setText(geminiKey != null ? geminiKey : "");
-                claudeKeyField.setText(claudeKey != null ? claudeKey : "");
+
                 ollamaHostField.setText(ollamaHost != null ? ollamaHost : DEFAULT_OLLAMA_HOST);
                 
                 // Set selected model
@@ -462,106 +394,29 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- Only return JSON with findings, no other content!";
     }
     
-    private boolean validateApiKeyWithEndpoint(String apiKey, String endpoint, String jsonBody, String provider) {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
-            conn.setRequestMethod(jsonBody.isEmpty() ? "GET" : "POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-    
-            // Add provider-specific headers
-            if ("openai".equals(provider)) {
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-            } else if ("claude".equals(provider)) {
-                conn.setRequestProperty("x-api-key", apiKey);
-                conn.setRequestProperty("anthropic-version", "2023-06-01");
-            }
-    
-            // Send request body if necessary
-            if (!jsonBody.isEmpty()) {
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-    
-            // Check response code
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 200) {
-                return true;
-            } else {
-                // Log error response
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
-                    StringBuilder errorResponse = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errorResponse.append(line);
-                    }
-                    api.logging().logToError("Validation failed: " + errorResponse);
-                }
-                return false;
-            }
-        } catch (Exception e) {
-            api.logging().logToError("Error validating API key: " + e.getMessage());
-            return false;
+    private void validateOllamaHost()() {
+        String host = ollamaHostField.getText().trim();
+        if (host.isEmpty()) {
+            showValidationError("Ollama host is empty");
+            return;
         }
-    }
-    
-    
-    private void validateApiKey(String provider) {
-        String apiKey = "";
-        String endpoint = "";
-        String jsonBody = "";
-        boolean isValid = false;
-    
         try {
-            switch (provider) {
-                case "openai":
-                    apiKey = openaiKeyField.getText();
-                    endpoint = "https://api.openai.com/v1/models";
-                    break;
-    
-                    case "gemini":
-                    apiKey = geminiKeyField.getText();
-                    endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
-                    jsonBody = "{"
-                             + "  \"contents\": ["
-                             + "    {\"parts\": [{\"text\": \"one plus one equals (respond with one integer only)\"}]}"
-                             + "  ]"
-                             + "}";
-                    break;
-                
-    
-                    case "claude":
-                    apiKey = claudeKeyField.getText();
-                    endpoint = "https://api.anthropic.com/v1/messages";
-                    jsonBody = "{"
-                             + "  \"model\": \"claude-3-5-sonnet-latest\","
-                             + "  \"max_tokens\": 1024,"
-                             + "  \"messages\": ["
-                             + "    {\"role\": \"user\", \"content\": \"one plus one equals (respond with one integer only)\"}"
-                             + "  ]"
-                             + "}";
-                    break;
-
-                case "ollama":
-                    validateOllamaHost();
-                    return;
-
-                default:
-                    JOptionPane.showMessageDialog(mainPanel, "Unknown provider: " + provider, "Validation Error", JOptionPane.ERROR_MESSAGE);
-                    return;
+            if (!host.startsWith("http")) {
+                host = "http://" + host;
             }
-    
-            // Validate API key
-            isValid = validateApiKeyWithEndpoint(apiKey, endpoint, jsonBody, provider);
-    
-            // Display result
-            String message = isValid ? provider + " API key is valid" : provider + " API key validation failed";
-            JOptionPane.showMessageDialog(mainPanel, message);
-    
-        } catch (Exception e) {
-            api.logging().logToError("Error validating API key for " + provider + ": " + e.getMessage());
-            JOptionPane.showMessageDialog(mainPanel, "Error validating API key: " + e.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
+            URL url = new URL(host + "/api/tags");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            int code = conn.getResponseCode();
+            if (code == 200) {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host reachable");
+            } else {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host returned status " + code);
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(mainPanel, "Error reaching Ollama host: " + ex.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
+
         }
     }
 
@@ -595,45 +450,6 @@ private void showValidationError(String message) {
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(mainPanel, message, "Validation Error", JOptionPane.ERROR_MESSAGE));
     }
     
-    private boolean performValidationRequest(String testEndpoint, String jsonBody, Map<String, String> headers) throws Exception {
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(testEndpoint);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod(jsonBody.isEmpty() ? "GET" : "POST");
-    
-            // Set headers
-            for (Map.Entry<String, String> header : headers.entrySet()) {
-                conn.setRequestProperty(header.getKey(), header.getValue());
-            }
-    
-            // Send body if applicable
-            if (!jsonBody.isEmpty()) {
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-    
-            // Log response for debugging
-            int responseCode = conn.getResponseCode();
-            if (responseCode != 200) {
-                String responseMessage = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))
-                    .lines().reduce("", String::concat);
-                throw new Exception("API error " + responseCode + ": " + responseMessage);
-            }
-    
-            return true;
-    
-        } finally {
-            if (conn != null) {
-                conn.disconnect();
-            }
-        }
-    }
-    
-    
-
     @Override
     public List<Component> provideMenuItems(ContextMenuEvent event) {
     List<Component> menuItems = new ArrayList<>();
@@ -648,13 +464,13 @@ private void showValidationError(String message) {
         // Check for text selection using selectionOffsets
         Optional<Range> selectionRange = editor.selectionOffsets();
         if (selectionRange.isPresent()) {
-            JMenuItem scanSelected = new JMenuItem("AI Auditor > Scan Selected Portion");
+            JMenuItem scanSelected = new JMenuItem("AI Companion > Scan Selected Portion");
             scanSelected.addActionListener(e -> handleSelectedScan(editor));
             menuItems.add(scanSelected);
         }
 
         // Add full scan option
-        JMenuItem scanFull = new JMenuItem("AI Auditor > Scan Full Request/Response");
+        JMenuItem scanFull = new JMenuItem("AI Companion > Scan Full Request/Response");
         scanFull.addActionListener(e -> handleFullScan(reqRes));
         menuItems.add(scanFull);
     });
@@ -663,11 +479,11 @@ private void showValidationError(String message) {
     List<HttpRequestResponse> selectedItems = event.selectedRequestResponses();
     if (!selectedItems.isEmpty()) {
         if (selectedItems.size() == 1) {
-            JMenuItem scanItem = new JMenuItem("AI Auditor > Scan Request/Response");
+            JMenuItem scanItem = new JMenuItem("AI Companion > Scan Request/Response");
             scanItem.addActionListener(e -> handleFullScan(selectedItems.get(0)));
             menuItems.add(scanItem);
         } else {
-            JMenuItem scanMultiple = new JMenuItem(String.format("AI Auditor > Scan %d Requests", selectedItems.size()));
+            JMenuItem scanMultiple = new JMenuItem(String.format("AI Companion > Scan %d Requests", selectedItems.size()));
             scanMultiple.addActionListener(e -> handleMultipleScan(selectedItems));
             menuItems.add(scanMultiple);
         }
@@ -994,7 +810,7 @@ private void processAIFindings(JSONObject aiResponse, HttpRequestResponse reques
 
             // Build issue details
             StringBuilder issueDetail = new StringBuilder();
-            issueDetail.append("Issue identified by AI Auditor\n\n");
+            issueDetail.append("Issue identified by AI Companion\n\n");
             issueDetail.append("Location: ").append(finding.optString("location", "Unknown")).append("\n\n");
             issueDetail.append("Detailed Explanation:\n").append(finding.optString("explanation", "No explanation provided")).append("\n\n");
             issueDetail.append("Confidence Level: ").append(confidence.name()).append("\n");
@@ -1162,9 +978,7 @@ private AuditIssueConfidence parseConfidence(String confidence) {
 private String getSelectedModel() {
     String model = (String) modelDropdown.getSelectedItem();
     if ("Default".equals(model)) {
-        if (!new String(claudeKeyField.getPassword()).isEmpty()) return "claude-3-5-haiku-latest";
-        if (!new String(openaiKeyField.getPassword()).isEmpty()) return "gpt-4o-mini"; // Set gpt-4o-mini as the default OpenAI model
-        if (!new String(geminiKeyField.getPassword()).isEmpty()) return "gemini-1.5-flash";
+
         String host = ollamaHostField.getText();
         if (host != null && !host.trim().isEmpty()) return "llama3";
     }
@@ -1178,9 +992,6 @@ private String getApiKeyForModel(String model) {
         return null;
     }
     switch (provider) {
-        case "openai": return new String(openaiKeyField.getPassword());
-        case "gemini": return new String(geminiKeyField.getPassword());
-        case "claude": return new String(claudeKeyField.getPassword());
         case "ollama": return ""; // no API key needed
         default: return null;
     }

@@ -2,7 +2,7 @@
  * AIAuditIssue.java
  * Author: Richard Hyunho Im (@richeeta), Route Zero Security
  * 
- * Represents individual security findings identified by the AI Auditor.
+ * Represents individual security findings identified by the AI Companion.
  * This class encapsulates details such as the vulnerability type, location,
  * confidence level, severity, and actionable recommendations, making them 
  * compatible with Burp Suite’s issue tracking framework.
@@ -76,7 +76,7 @@
      public AuditIssueDefinition definition() {
          return AuditIssueDefinition.auditIssueDefinition(
              name,
-             "This issue was identified by the AI Auditor extension.",
+            "This issue was identified by the AI Companion extension.",
              "Review the AI-generated findings and validate the identified issues.",
              severity
          );
