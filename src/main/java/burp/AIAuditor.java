@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.util.concurrent.*;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
  
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -448,6 +449,13 @@ private void showValidationError(String message) {
         JMenuItem scanFull = new JMenuItem("AI Companion > Scan Full Request/Response");
         scanFull.addActionListener(e -> handleFullScan(reqRes));
         menuItems.add(scanFull);
+
+        // Add rename tab option only in Repeater
+        if (event.isFromTool(ToolType.REPEATER)) {
+            JMenuItem renameTab = new JMenuItem("AI Companion > Rename Tab");
+            renameTab.addActionListener(a -> handleRenameRepeaterTab(editor));
+            menuItems.add(renameTab);
+        }
     });
 
     // Handle Proxy History / Site Map selection
@@ -531,6 +539,57 @@ private void showValidationError(String message) {
                 }
             }
         }
+    }
+
+    private void handleRenameRepeaterTab(MessageEditorHttpRequestResponse editor) {
+        HttpRequestResponse reqRes = editor.requestResponse();
+        if (reqRes == null || reqRes.request() == null) {
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                String requestText = reqRes.request().toString();
+                String caption = generateTabName(requestText);
+                api.repeater().sendToRepeater(reqRes.request(), caption);
+            } catch (Exception e) {
+                api.logging().logToError("Error renaming repeater tab: " + e.getMessage());
+                showError("Error renaming repeater tab", e);
+            }
+        });
+    }
+
+    private String generateTabName(String request) throws Exception {
+        String host = ollamaHostField.getText().trim();
+        if (host.isEmpty()) {
+            host = DEFAULT_OLLAMA_HOST;
+        }
+        if (!host.startsWith("http")) {
+            host = "http://" + host;
+        }
+
+        URL url = new URL(host + "/api/generate");
+
+        String prompt = "Suggest a brief name (max three words) in uppercase with underscores for the following HTTP request. Only return the name." +
+                "\n\nHTTP request:\n" + request;
+
+        JSONObject body = new JSONObject();
+        body.put("model", "llama3");
+        body.put("prompt", prompt);
+        body.put("stream", false);
+
+        JSONObject resp = sendRequest(url, body, "", "llama3");
+        String rawName = extractContentFromResponse(resp, "llama3").trim();
+
+        rawName = rawName.replaceAll("[^A-Za-z0-9 ]", " ");
+        String[] words = rawName.split("\\s+");
+        if (words.length > 3) {
+            words = Arrays.copyOfRange(words, 0, 3);
+        }
+        return Arrays.stream(words)
+                .filter(w -> !w.isEmpty())
+                .map(String::toUpperCase)
+                .collect(Collectors.joining("_"));
     }
 
     private void processAuditRequest(HttpRequestResponse reqRes, String selectedContent, boolean isSelectedPortion) {
