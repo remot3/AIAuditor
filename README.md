@@ -1,5 +1,4 @@
 # AI Companion: Local LLM-Powered Burp Scans with Ollama
-**Author**: Richard Hyunho Im ([@richeeta](https://github.com/richeeta)) at [Route Zero Security](https://routezero.security)
 
 ## Description
 AI Companion is an extension for Burp Suite Professional and Enterprise editions that leverages locally hosted models through Ollama to enhance vulnerability scanning and analysis.
