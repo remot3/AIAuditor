@@ -587,12 +587,6 @@ private void showValidationError(String message) {
         String provider = MODEL_MAPPING.get(selectedModel);
         String apiKey = getApiKeyForModel(selectedModel);
 
-        if (!"ollama".equals(provider) && (apiKey == null || apiKey.isEmpty())) {
-            SwingUtilities.invokeLater(() ->
-                JOptionPane.showMessageDialog(mainPanel, "API key not configured for " + selectedModel));
-            return;
-        }
-
         CompletableFuture<JSONObject> future = threadPoolManager.submitTask(provider, () -> {
             String request = reqRes.request().toString();
             String response = reqRes.response() != null ? reqRes.response().toString() : "";
@@ -680,12 +674,6 @@ private void showValidationError(String message) {
         String selectedModel = getSelectedModel();
         String provider = MODEL_MAPPING.get(selectedModel);
         String apiKey = getApiKeyForModel(selectedModel);
-
-        if (!"ollama".equals(provider) && (apiKey == null || apiKey.isEmpty())) {
-            SwingUtilities.invokeLater(() ->
-                JOptionPane.showMessageDialog(mainPanel, "API key not configured for " + selectedModel));
-            return;
-        }
     
         CompletableFuture.runAsync(() -> {
             try {
@@ -759,34 +747,6 @@ private void showValidationError(String message) {
     
         // Configure endpoint and payload
         switch (provider) {
-            case "openai":
-                url = new URL("https://api.openai.com/v1/chat/completions");
-                jsonBody.put("model", model)
-                        .put("messages", new JSONArray()
-                            .put(new JSONObject()
-                                .put("role", "user")
-                                .put("content", prompt + "\n\nContent to analyze:\n" + content)));
-                break;
-    
-            case "gemini":
-                url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey);
-                jsonBody.put("contents", new JSONArray()
-                        .put(new JSONObject()
-                            .put("parts", new JSONArray()
-                                .put(new JSONObject()
-                                    .put("text", prompt + "\n\nContent to analyze:\n" + content)))));
-                break;
-    
-            case "claude":
-                url = new URL("https://api.anthropic.com/v1/messages");
-                jsonBody.put("model", model)
-                        .put("max_tokens", 1024)
-                        .put("messages", new JSONArray()
-                            .put(new JSONObject()
-                                .put("role", "user")
-                                .put("content", prompt + "\n\nContent to analyze:\n" + content)));
-                break;
-
             case "ollama":
                 String base = ollamaHostField.getText().trim();
                 if (base.isEmpty()) {
@@ -833,20 +793,8 @@ private void showValidationError(String message) {
         conn.setReadTimeout(30000);
 
         String provider = MODEL_MAPPING.get(model);
-        switch (provider) {
-            case "claude":
-                conn.setRequestProperty("x-api-key", apiKey);
-                conn.setRequestProperty("anthropic-version", "2023-06-01");
-                break;
-            case "openai":
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-                break;
-            case "gemini":
-                // Google API key is included in the URL bc ofc Google
-                break;
-            case "ollama":
-                // no authentication required
-                break;
+        if ("ollama".equals(provider)) {
+            // no authentication required
         }
 
         // Send the request body
@@ -970,38 +918,6 @@ private String extractContentFromResponse(JSONObject response, String model) {
         api.logging().logToOutput("Raw response: " + response.toString());
 
         switch (provider) {
-            case "claude":
-                // Extract "text" for Claude
-                if (response.has("content")) {
-                    JSONArray contentArray = response.getJSONArray("content");
-                    if (contentArray.length() > 0) {
-                        return contentArray.getJSONObject(0).getString("text");
-                    }
-                }
-                break;
-
-            case "gemini":
-                // Extract "text" under "candidates" > "content" > "parts" for Gemini
-                JSONArray candidates = response.optJSONArray("candidates");
-                if (candidates != null && candidates.length() > 0) {
-                    JSONObject candidate = candidates.getJSONObject(0);
-                    JSONObject content = candidate.optJSONObject("content");
-                    if (content != null) {
-                        JSONArray parts = content.optJSONArray("parts");
-                        if (parts != null && parts.length() > 0) {
-                            return parts.getJSONObject(0).getString("text");
-                        }
-                    }
-                }
-                break;
-
-            case "openai":
-                return response
-                        .getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content");
-
             case "ollama":
                 return response.getString("response");
 
