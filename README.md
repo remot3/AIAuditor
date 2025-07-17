@@ -13,11 +13,7 @@ AI Companion enhances Burp Suite by using local large language models to analyze
 - **Local AI Integration** with Ollama (e.g., `llama3`).
 - **Auto-named Repeater Tabs** so requests are easier to track.
 - **Context-aware Test Suggestions** for each request/response.
-- **Scan Full Messages or Selections** via the context menu.
-- **Detailed Findings** with severity, confidence and remediation notes.
 - **Persistent Settings** for prompts and host configuration.
-- **Rate-limited Thread Pool** to manage concurrent analysis.
-- **Burp Scanner Integration** with results shown in the Notes tab.
 
 ## Prerequisites
 - **Burp Suite Professional or Enterprise** (Community edition is not supported).
@@ -27,7 +23,7 @@ AI Companion enhances Burp Suite by using local large language models to analyze
 ## Installation
 ### Building from Source
 ```bash
-git clone https://github.com/richeeta/ai-auditor.git
+git clone https://github.com/remot3/ai-auditor.git
 cd ai-auditor
 mvn clean package
 ```
@@ -41,8 +37,8 @@ The JAR will be created at `target/ai-auditor-1.0-SNAPSHOT-jar-with-dependencies
 1. Open the **AI Companion** tab and enter your Ollama host. Click **Validate** to confirm connectivity.
 2. (Optional) Provide custom instructions or a test prompt.
 3. Right-click a request/response and choose **AI Companion** actions:
-   - **Scan Full Request/Response**
-   - **Scan Selected Portion**
+   - **Sugest Tests**
+   - **Rename Repeater Tab**
 4. Review findings in the **Notes** tab.
 
 ## Tips
