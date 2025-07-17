@@ -128,6 +128,11 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         
         api.logging().logToOutput("Extension initialization complete");
     }
+
+    @Override
+    public void extensionUnloaded() {
+        cleanup();
+    }
     private void cleanup() {
         isShuttingDown = true;
         if (threadPoolManager != null) {
