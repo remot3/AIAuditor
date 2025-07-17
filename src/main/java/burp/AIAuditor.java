@@ -77,7 +77,8 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
 
     private JTextField ollamaHostField;
      private JComboBox<String> modelDropdown;
-     private JTextArea promptTemplateArea;
+    private JTextArea promptTemplateArea;
+    private JTextArea testPromptArea;
      private JButton saveButton;
      private Registration menuRegistration;
      private Registration scanCheckRegistration;
@@ -187,6 +188,16 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         gbc.gridx = 1;
         settingsPanel.add(scrollPane, gbc);
 
+        // Test Suggestion Prompt
+        gbc.gridx = 0; gbc.gridy = 3;
+        settingsPanel.add(new JLabel("Test Prompt:"), gbc);
+        testPromptArea = new JTextArea(3, 40);
+        testPromptArea.setLineWrap(true);
+        testPromptArea.setWrapStyleWord(true);
+        JScrollPane testScroll = new JScrollPane(testPromptArea);
+        gbc.gridx = 1;
+        settingsPanel.add(testScroll, gbc);
+
         // Save Button
         saveButton = new JButton("Save Settings");
         saveButton.addActionListener(new ActionListener() {
@@ -196,7 +207,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             }
         });
 
-        gbc.gridx = 1; gbc.gridy = 3;
+        gbc.gridx = 1; gbc.gridy = 4;
 
         settingsPanel.add(saveButton, gbc);
 
@@ -246,6 +257,13 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             String defaultPrompt = getDefaultPromptTemplate();
             if (!currentPrompt.equals(defaultPrompt)) {
                 api.persistence().preferences().setString(PREF_PREFIX + "custom_prompt", currentPrompt);
+            }
+
+            // Save custom test prompt if modified
+            String currentTestPrompt = testPromptArea.getText();
+            String defaultTestPrompt = getDefaultTestingPrompt();
+            if (!currentTestPrompt.equals(defaultTestPrompt)) {
+                api.persistence().preferences().setString(PREF_PREFIX + "custom_test_prompt", currentTestPrompt);
             }
             
             // Save timestamp
@@ -304,6 +322,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             
             // Load custom prompt if exists
             String customPrompt = api.persistence().preferences().getString(PREF_PREFIX + "custom_prompt");
+
+            // Load custom test prompt if exists
+            String customTestPrompt = api.persistence().preferences().getString(PREF_PREFIX + "custom_test_prompt");
             
             // Log retrieval status
             api.logging().logToOutput("Retrieved from preferences:");
@@ -323,6 +344,10 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 // Set custom prompt if exists
                 if (customPrompt != null && !customPrompt.isEmpty() && promptTemplateArea != null) {
                     promptTemplateArea.setText(customPrompt);
+                }
+
+                if (customTestPrompt != null && !customTestPrompt.isEmpty() && testPromptArea != null) {
+                    testPromptArea.setText(customTestPrompt);
                 }
                 
                 api.logging().logToOutput("UI fields updated with saved values");
@@ -394,6 +419,20 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- For sensitive info disclosure, specify exact data exposed\n" +
             "- Only return JSON with findings, no other content!";
     }
+
+    private String getDefaultTestingPrompt() {
+        return "You are a security tester. Review the following HTTP request and response and provide a short bulleted list of specific security tests to perform.";
+    }
+
+    private String getTestingPromptTemplate() {
+        if (testPromptArea != null) {
+            String txt = testPromptArea.getText().trim();
+            if (!txt.isEmpty()) {
+                return txt;
+            }
+        }
+        return getDefaultTestingPrompt();
+    }
     
 
     private void validateOllamaHost() {
@@ -445,8 +484,8 @@ private void showValidationError(String message) {
             menuItems.add(scanSelected);
         }
 
-        // Add full scan option
-        JMenuItem scanFull = new JMenuItem("AI Companion > Scan Full Request/Response");
+        // Add suggestion option
+        JMenuItem scanFull = new JMenuItem("AI Companion > Suggest Tests");
         scanFull.addActionListener(e -> handleFullScan(reqRes));
         menuItems.add(scanFull);
 
@@ -462,11 +501,11 @@ private void showValidationError(String message) {
     List<HttpRequestResponse> selectedItems = event.selectedRequestResponses();
     if (!selectedItems.isEmpty()) {
         if (selectedItems.size() == 1) {
-            JMenuItem scanItem = new JMenuItem("AI Companion > Scan Request/Response");
+            JMenuItem scanItem = new JMenuItem("AI Companion > Suggest Tests");
             scanItem.addActionListener(e -> handleFullScan(selectedItems.get(0)));
             menuItems.add(scanItem);
         } else {
-            JMenuItem scanMultiple = new JMenuItem(String.format("AI Companion > Scan %d Requests", selectedItems.size()));
+            JMenuItem scanMultiple = new JMenuItem(String.format("AI Companion > Suggest Tests for %d Requests", selectedItems.size()));
             scanMultiple.addActionListener(e -> handleMultipleScan(selectedItems));
             menuItems.add(scanMultiple);
         }
@@ -510,7 +549,7 @@ private void showValidationError(String message) {
         if (reqRes == null || reqRes.request() == null) {
             return;
         }
-        processAuditRequest(reqRes, null, false);
+        processTestSuggestions(reqRes);
     }
 
     private void handleMultipleScan(List<HttpRequestResponse> requests) {
@@ -525,7 +564,7 @@ private void showValidationError(String message) {
             
             for (HttpRequestResponse reqRes : batch) {
                 if (reqRes != null && reqRes.request() != null) {
-                    processAuditRequest(reqRes, null, false);
+                    processTestSuggestions(reqRes);
                 }
             }
 
@@ -539,6 +578,47 @@ private void showValidationError(String message) {
                 }
             }
         }
+    }
+
+    private void processTestSuggestions(HttpRequestResponse reqRes) {
+        String selectedModel = getSelectedModel();
+        String provider = MODEL_MAPPING.get(selectedModel);
+        String apiKey = getApiKeyForModel(selectedModel);
+
+        if (!"ollama".equals(provider) && (apiKey == null || apiKey.isEmpty())) {
+            SwingUtilities.invokeLater(() ->
+                JOptionPane.showMessageDialog(mainPanel, "API key not configured for " + selectedModel));
+            return;
+        }
+
+        CompletableFuture<JSONObject> future = threadPoolManager.submitTask(provider, () -> {
+            String request = reqRes.request().toString();
+            String response = reqRes.response() != null ? reqRes.response().toString() : "";
+            String content = request + "\n\n" + response;
+            String prompt = getTestingPromptTemplate();
+            return sendToAI(selectedModel, apiKey, content, prompt);
+        });
+
+        future.thenAccept(result -> {
+            try {
+                String ideas = extractContentFromResponse(result, selectedModel);
+                if (ideas != null && !ideas.isEmpty()) {
+                    String list = extractTestsList(ideas);
+                    if (!list.isEmpty()) {
+                        reqRes.annotations().setNotes("Security Tests to Perform:\n" + list);
+                    } else {
+                        reqRes.annotations().setNotes(ideas.trim());
+                    }
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Error processing AI suggestions: " + e.getMessage());
+                showError("Error processing AI suggestions", e);
+            }
+        }).exceptionally(e -> {
+            api.logging().logToError("Error getting AI suggestions: " + e.getMessage());
+            showError("Error getting AI suggestions", e);
+            return null;
+        });
     }
 
     private void handleRenameRepeaterTab(MessageEditorHttpRequestResponse editor) {
@@ -656,15 +736,19 @@ private void showValidationError(String message) {
     
 
     private JSONObject sendToAI(String model, String apiKey, String content) throws Exception {
+        return sendToAI(model, apiKey, content, null);
+    }
+
+    private JSONObject sendToAI(String model, String apiKey, String content, String overridePrompt) throws Exception {
         String provider = MODEL_MAPPING.get(model);
         if (provider == null) {
             throw new IllegalArgumentException("Unsupported model: " + model);
         }
-    
+
         URL url;
         JSONObject jsonBody = new JSONObject();
-        String prompt = promptTemplateArea.getText();
-    
+        String prompt = overridePrompt != null ? overridePrompt : promptTemplateArea.getText();
+
         if (prompt == null || prompt.isEmpty()) {
             prompt = getDefaultPromptTemplate();
         }
@@ -924,6 +1008,23 @@ private String extractContentFromResponse(JSONObject response, String model) {
         api.logging().logToError("Error extracting content from response: " + e.getMessage());
     }
     return "";
+}
+
+private String extractTestsList(String text) {
+    if (text == null) return "";
+    StringBuilder sb = new StringBuilder();
+    for (String line : text.split("\n")) {
+        String trimmed = line.trim();
+        if (trimmed.matches("^[-*].*")) {
+            sb.append(trimmed).append("\n");
+        } else if (trimmed.matches("^\\d+.*")) {
+            // remove leading numbers and punctuation
+            String cleaned = trimmed.replaceFirst("^\\d+\\.\\s*", "");
+            cleaned = cleaned.replaceFirst("^\\d+\\)\\s*", "");
+            sb.append("- ").append(cleaned).append("\n");
+        }
+    }
+    return sb.toString().trim();
 }
 
 private String formatFindingDetails(JSONObject finding) {
