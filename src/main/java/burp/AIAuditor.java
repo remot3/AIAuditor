@@ -394,31 +394,6 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- Only return JSON with findings, no other content!";
     }
     
-    private void validateOllamaHost()() {
-        String host = ollamaHostField.getText().trim();
-        if (host.isEmpty()) {
-            showValidationError("Ollama host is empty");
-            return;
-        }
-        try {
-            if (!host.startsWith("http")) {
-                host = "http://" + host;
-            }
-            URL url = new URL(host + "/api/tags");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            int code = conn.getResponseCode();
-            if (code == 200) {
-                JOptionPane.showMessageDialog(mainPanel, "Ollama host reachable");
-            } else {
-                JOptionPane.showMessageDialog(mainPanel, "Ollama host returned status " + code);
-            }
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(mainPanel, "Error reaching Ollama host: " + ex.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
-
-        }
-    }
 
     private void validateOllamaHost() {
         String host = ollamaHostField.getText().trim();
