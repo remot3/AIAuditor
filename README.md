@@ -3,22 +3,15 @@
 ## Description
 AI Companion is an extension for Burp Suite Professional and Enterprise editions that leverages locally hosted models through Ollama to enhance vulnerability scanning and analysis.
 
-### Issues Reported by AI Companion
-![ScannerReport](images/ScannerReport.png)
+### AutoGuess repeater Tab name
+<img width="1321" height="860" alt="image" src="https://github.com/user-attachments/assets/7940e976-b791-41c9-9506-00890a2e70fa" />
 
-### Scan Selected Text
-![ScanSelection](images/ScanSelection.png)
-
-### Scan Request/Response
-![ScanRequestResponse](images/ScanRequestResponse.png)
+### Sugest tests based on observed items in Request/Response
+<img width="1876" height="647" alt="image" src="https://github.com/user-attachments/assets/4fb99333-d151-4f27-b5a0-984645a35f31" />
 
 ## Features
 ### Core Capabilities
 * **Local AI Integration**: Supports local models via **Ollama** (e.g., `llama3`)
-* **Detailed Vulnerability Reporting**: Vulnerability description, location, exploitation methods, severity levels (`HIGH`, `MEDIUM`, `LOW`, `INFORMATIVE`) and confidence levels (`CERTAIN`, `FIRM`, `TENTATIVE`).
-* **Custom Instructions**: Tailor the AI’s focus and analysis for special use cases.
-* ~~**Context-Aware Analysis**: Configure number of requests/responses analyzed together (`0`—`5`).~~
-* **Integration with Burp Scanner**: Findings are automatically added to Burp’s issue tracker.
 * **Persistent Settings**: Custom instructions and Ollama host settings persist across sessions.
 
 ## Prerequisites
