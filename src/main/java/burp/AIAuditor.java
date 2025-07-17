@@ -77,7 +77,8 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
 
     private JTextField ollamaHostField;
      private JComboBox<String> modelDropdown;
-     private JTextArea promptTemplateArea;
+    private JTextArea promptTemplateArea;
+    private JTextArea testPromptArea;
      private JButton saveButton;
      private Registration menuRegistration;
      private Registration scanCheckRegistration;
@@ -187,6 +188,16 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         gbc.gridx = 1;
         settingsPanel.add(scrollPane, gbc);
 
+        // Test Suggestion Prompt
+        gbc.gridx = 0; gbc.gridy = 3;
+        settingsPanel.add(new JLabel("Test Prompt:"), gbc);
+        testPromptArea = new JTextArea(3, 40);
+        testPromptArea.setLineWrap(true);
+        testPromptArea.setWrapStyleWord(true);
+        JScrollPane testScroll = new JScrollPane(testPromptArea);
+        gbc.gridx = 1;
+        settingsPanel.add(testScroll, gbc);
+
         // Save Button
         saveButton = new JButton("Save Settings");
         saveButton.addActionListener(new ActionListener() {
@@ -196,7 +207,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             }
         });
 
-        gbc.gridx = 1; gbc.gridy = 3;
+        gbc.gridx = 1; gbc.gridy = 4;
 
         settingsPanel.add(saveButton, gbc);
 
@@ -246,6 +257,13 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             String defaultPrompt = getDefaultPromptTemplate();
             if (!currentPrompt.equals(defaultPrompt)) {
                 api.persistence().preferences().setString(PREF_PREFIX + "custom_prompt", currentPrompt);
+            }
+
+            // Save custom test prompt if modified
+            String currentTestPrompt = testPromptArea.getText();
+            String defaultTestPrompt = getDefaultTestingPrompt();
+            if (!currentTestPrompt.equals(defaultTestPrompt)) {
+                api.persistence().preferences().setString(PREF_PREFIX + "custom_test_prompt", currentTestPrompt);
             }
             
             // Save timestamp
@@ -304,6 +322,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             
             // Load custom prompt if exists
             String customPrompt = api.persistence().preferences().getString(PREF_PREFIX + "custom_prompt");
+
+            // Load custom test prompt if exists
+            String customTestPrompt = api.persistence().preferences().getString(PREF_PREFIX + "custom_test_prompt");
             
             // Log retrieval status
             api.logging().logToOutput("Retrieved from preferences:");
@@ -323,6 +344,10 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 // Set custom prompt if exists
                 if (customPrompt != null && !customPrompt.isEmpty() && promptTemplateArea != null) {
                     promptTemplateArea.setText(customPrompt);
+                }
+
+                if (customTestPrompt != null && !customTestPrompt.isEmpty() && testPromptArea != null) {
+                    testPromptArea.setText(customTestPrompt);
                 }
                 
                 api.logging().logToOutput("UI fields updated with saved values");
@@ -395,8 +420,20 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             "- Only return JSON with findings, no other content!";
     }
 
-    private String getTestingPromptTemplate() {
+
+    private String getDefaultTestingPrompt() {
         return "You are a security tester. Review the following HTTP request and response and provide a short bulleted list of specific security tests to perform.";
+    }
+
+    private String getTestingPromptTemplate() {
+        if (testPromptArea != null) {
+            String txt = testPromptArea.getText().trim();
+            if (!txt.isEmpty()) {
+                return txt;
+            }
+        }
+        return getDefaultTestingPrompt();
+
     }
     
 
@@ -568,7 +605,14 @@ private void showValidationError(String message) {
             try {
                 String ideas = extractContentFromResponse(result, selectedModel);
                 if (ideas != null && !ideas.isEmpty()) {
-                    reqRes.annotations().setNotes(ideas.trim());
+
+                    String list = extractTestsList(ideas);
+                    if (!list.isEmpty()) {
+                        reqRes.annotations().setNotes("Security Tests to Perform:\n" + list);
+                    } else {
+                        reqRes.annotations().setNotes(ideas.trim());
+                    }
+
                 }
             } catch (Exception e) {
                 api.logging().logToError("Error processing AI suggestions: " + e.getMessage());
@@ -968,6 +1012,23 @@ private String extractContentFromResponse(JSONObject response, String model) {
         api.logging().logToError("Error extracting content from response: " + e.getMessage());
     }
     return "";
+}
+
+private String extractTestsList(String text) {
+    if (text == null) return "";
+    StringBuilder sb = new StringBuilder();
+    for (String line : text.split("\n")) {
+        String trimmed = line.trim();
+        if (trimmed.matches("^[-*].*")) {
+            sb.append(trimmed).append("\n");
+        } else if (trimmed.matches("^\\d+.*")) {
+            // remove leading numbers and punctuation
+            String cleaned = trimmed.replaceFirst("^\\d+\\.\\s*", "");
+            cleaned = cleaned.replaceFirst("^\\d+\\)\\s*", "");
+            sb.append("- ").append(cleaned).append("\n");
+        }
+    }
+    return sb.toString().trim();
 }
 
 private String formatFindingDetails(JSONObject finding) {
