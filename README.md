@@ -23,8 +23,8 @@ AI Companion enhances Burp Suite by using local large language models to analyze
 ## Installation
 ### Building from Source
 ```bash
-git clone https://github.com/remot3/ai-auditor.git
-cd ai-auditor
+git clone https://github.com/remot3/AICompanion.git
+cd AICompanion
 mvn clean package
 ```
 The JAR will be created at `target/ai-auditor-1.0-SNAPSHOT-jar-with-dependencies.jar`.
