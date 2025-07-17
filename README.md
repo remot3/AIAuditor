@@ -89,6 +89,7 @@ The compiled JAR will be available at `target/ai-auditor-1.0-SNAPSHOT-jar-with-d
 
 ## Usage
 ### Initial Setup
+
 1. Go to the AI Companion tab in Burp Suite.
 2. Specify your Ollama host and click **Validate** to ensure it's reachable. The **Default** model will automatically use the local `llama3` model when an Ollama host is provided.
 3. *Optional*: Add **Custom Instructions** to refine the analysis.

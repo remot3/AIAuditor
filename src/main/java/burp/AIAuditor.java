@@ -73,6 +73,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
      
      // UI Components
      private JPanel mainPanel;
+
     private JTextField ollamaHostField;
      private JComboBox<String> modelDropdown;
      private JTextArea promptTemplateArea;
@@ -162,17 +163,20 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         gbc.gridx = 2;
         settingsPanel.add(validateOllamaButton, gbc);
 
+
         // Model Selection
         gbc.gridx = 0; gbc.gridy = 1;
         settingsPanel.add(new JLabel("AI Model:"), gbc);
         modelDropdown = new JComboBox<>(new String[]{
             "Default",
             "llama3"
+
         });
         gbc.gridx = 1;
         settingsPanel.add(modelDropdown, gbc);
 
         // Custom Prompt Template
+
         gbc.gridx = 0; gbc.gridy = 2;
         settingsPanel.add(new JLabel("Prompt Template:"), gbc);
         promptTemplateArea = new JTextArea(5, 40);
@@ -190,7 +194,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
                 saveSettings();
             }
         });
+
         gbc.gridx = 1; gbc.gridy = 3;
+
         settingsPanel.add(saveButton, gbc);
 
         /* planned for future release
@@ -214,12 +220,14 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         api.logging().logToOutput("Starting saveSettings()...");
 
         try {
+
             String ollamaHost = ollamaHostField.getText().trim();
 
             if (ollamaHost.isEmpty()) {
                 SwingUtilities.invokeLater(() -> {
                     JOptionPane.showMessageDialog(mainPanel,
                         "Please configure the Ollama host",
+
                         "Validation Error",
                         JOptionPane.WARNING_MESSAGE);
                 });
@@ -243,7 +251,9 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             api.persistence().preferences().setLong(PREF_PREFIX + "last_save", System.currentTimeMillis());
             
             // Verify saves were successful
+
             boolean allValid = verifySettings(ollamaHost);
+
             
             if (allValid) {
                 SwingUtilities.invokeLater(() -> {
@@ -265,11 +275,13 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         }
     }
     
+
     private boolean verifySettings(String ollamaHost) {
         String verifyOllama = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
         boolean valid = ollamaHost.equals(verifyOllama);
         if (!valid) {
             api.logging().logToError("Settings verification failed: Ollama host mismatch");
+
         }
         return valid;
     }
@@ -283,6 +295,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
         }
         
         try {
+
             String ollamaHost = api.persistence().preferences().getString(PREF_PREFIX + "ollama_host");
             
             // Load selected model
@@ -298,6 +311,7 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
             
             // Update UI components
             SwingUtilities.invokeLater(() -> {
+
                 ollamaHostField.setText(ollamaHost != null ? ollamaHost : DEFAULT_OLLAMA_HOST);
                 
                 // Set selected model
@@ -381,6 +395,32 @@ public class AIAuditor implements BurpExtension, ContextMenuItemsProvider, ScanC
     }
     
     private void validateOllamaHost()() {
+        String host = ollamaHostField.getText().trim();
+        if (host.isEmpty()) {
+            showValidationError("Ollama host is empty");
+            return;
+        }
+        try {
+            if (!host.startsWith("http")) {
+                host = "http://" + host;
+            }
+            URL url = new URL(host + "/api/tags");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            int code = conn.getResponseCode();
+            if (code == 200) {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host reachable");
+            } else {
+                JOptionPane.showMessageDialog(mainPanel, "Ollama host returned status " + code);
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(mainPanel, "Error reaching Ollama host: " + ex.getMessage(), "Validation Error", JOptionPane.ERROR_MESSAGE);
+
+        }
+    }
+
+    private void validateOllamaHost() {
         String host = ollamaHostField.getText().trim();
         if (host.isEmpty()) {
             showValidationError("Ollama host is empty");
@@ -938,6 +978,7 @@ private AuditIssueConfidence parseConfidence(String confidence) {
 private String getSelectedModel() {
     String model = (String) modelDropdown.getSelectedItem();
     if ("Default".equals(model)) {
+
         String host = ollamaHostField.getText();
         if (host != null && !host.trim().isEmpty()) return "llama3";
     }
